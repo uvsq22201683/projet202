@@ -223,7 +223,7 @@ def Zig_zag_rle(blocks):
     blocks1 = []
     for i in range(len(blocks)):
         b1 = []
-        for j in range(1, 65):
+        for j in range(0, 64):
             if j < 8:
                 slice = [w[:j] for w in blocks[i][:j]]
             else:
@@ -235,7 +235,7 @@ def Zig_zag_rle(blocks):
 
         b2 = []
         count_0 = 0
-        for j in range(64):
+        for j in range(0, 65):
                 if b1[j] == 0:
                     count_0 += 1
                 else:
@@ -247,10 +247,12 @@ def Zig_zag_rle(blocks):
             b2.append(f'#{count_0}')
         blocks1.append(b2)
     print('b1', len(blocks1))
+    #print('b1', b1)
     return blocks1
 
+
 def Zig_zag_unrle(matrix):
-    #print(matrix)
+    
     matrix = matrix.split(' ')
     blocks = []
     for i in range(len(matrix)):
@@ -259,17 +261,29 @@ def Zig_zag_unrle(matrix):
                 blocks.append(0)
         else:
             blocks.append(int(matrix[i]))
-    #blocks = np.array(blocks)
-    #blocks = np.reshape(blocks, (blocks.shape[0]//64,64))
-    blocks1 = [[0]*8]*8
-    for i in range(64):
-        blocks1[i//8][i%8] = blocks[i]
-        if i==0:
-            print(blocks1[0][0])
-    #blocks1 = np.array(blocks1)
-    #print(blocks1)
-    return blocks1
-
+    
+    blocks1_1 = np.array([[0]*8 for _ in range(8)])
+    blocks1_2 = np.array([[0]*8 for _ in range(8)])
+    #blocks1[0][0] = blocks[total]
+    #total+=1
+    to = 8
+    for b in [blocks1_1, blocks1_2]:
+        total = 0
+        for i in range(0,to):
+            for j in range(i+1):
+                if i%2==0:
+                    b[i-j, j] = blocks[total]
+                    total += 1
+                else:
+                    b[j, i-j] = blocks[total]
+                    total += 1
+        to -= 1
+        blocks = blocks[total:]
+        blocks.reverse()
+    
+    result = np.maximum(blocks1_1, blocks1_2[::-1,::-1])
+      
+    return result
 
 '''ressembler le tout'''
 
@@ -325,7 +339,7 @@ def write_file(img_path, mode = 2, use_rle = 'RLE', nb_de_seuil = 30):
     print('s', nb_de_seuil)
     y, cb, cr, initial_shape = compress(img_path, mode, nb_de_seuil)
     #y, cb, cr = np.around(y), np.around(cb, 1), np.around(cr, 1)
-    f = open(img_path[:-4]+'_compressed.txt', 'w')
+    f = open(img_path[:-4]+'_compressed1.txt', 'w')
 
     f.write('SJPG\n')
     f.write(f'{initial_shape[0]} {initial_shape[1]}\n') 
@@ -347,7 +361,7 @@ def write_file(img_path, mode = 2, use_rle = 'RLE', nb_de_seuil = 30):
     
     f.close()
 
-write_file('test.png', mode = 5, use_rle = 'RLE', nb_de_seuil = 4)
+write_file('test.png', mode = 4, use_rle = 'RLE', nb_de_seuil = 4)
 
 
 '''decompresser'''
@@ -441,15 +455,21 @@ def decompresser(path):
     save(img.astype('uint8'), 'new_test5.png')
  
 
-decompresser('test_compressed.txt')
+decompresser('test_compressed1.txt')
 
 print(psnr(load('test.png'), load('new_test5.png')))
 
 
-A = [[1,2,3,4],
-     [5,6,7,8],
-     [9,10,11,12],
-     [13,14,15,16]]
-#Zig_zag_rle(A)
+A = [[1,2,3,4, 51, 52, 53, 54],
+     [5,6,7,8, 51, 52, 53, 54],
+     [9,10,11,12, 51, 52, 53, 54],
+     [13,14,15,16, 51, 52, 53, 54],
+     [13,14,15,16, 51, 52, 53, 54],
+     [13,14,15,16, 51, 52, 53, 54],
+     [13,14,15,16, 51, 52, 53, 54],
+     [13,14,15,16, 51, 52, 53, 54],]
+#print(Zig_zag_rle([np.array(A)]))
+#print(' '.join(Zig_zag_rle([np.array(A)])[0]))
+#print(Zig_zag_unrle(' '.join(Zig_zag_rle([np.array(A)])[0])))
 
 
