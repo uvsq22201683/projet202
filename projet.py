@@ -26,6 +26,17 @@ def idct2(a):
 def save(a, path):
     Image.fromarray(a).save(path)
 
+'''quantification'''
+
+Q = np.array([[16, 11, 10, 16, 24, 40, 51, 61],
+     [12, 12, 14, 19, 26, 58, 60, 55],
+     [14, 13, 16, 24, 40, 57, 69, 56],
+     [14, 17, 22, 29, 51, 87, 80, 62],
+     [18, 22, 37, 56, 68, 109, 103, 77],
+     [24, 35, 55, 64, 81, 104, 113, 92],
+     [49, 64, 78, 87, 103, 121, 120, 101],
+     [72, 92, 95, 98, 112, 100, 103, 99]])
+
 
 '''rgb/ycbcr'''
 
@@ -140,7 +151,7 @@ def appliquer_idct(l_matrix):
 
 def seuil(blocks, s):
     for b in blocks:
-        b[b < s] = 0
+        b[abs(b) < s] = 0
     return blocks
 
 
@@ -184,16 +195,94 @@ def unrle(matrix):
     return blocks
 
 
+'''modes facultatives'''
+
+def mode3(blocks):
+    for i in range(len(blocks)):
+        limit =  np.sort(np.absolute(blocks[i].copy()), axis=None)[-8]
+        #blocks[i] = np.where(blocks[i] < limit or blocks[i] > limit*-1, 0, blocks[i])
+        blocks[i][abs(blocks[i]) < limit] = 0
+    return blocks
+
+def mode4_compress(blocks):
+    global Q
+    for i in range(len(blocks)):
+        blocks[i] = (blocks[i]/Q).astype('int')
+        #blocks[i] = blocks[i]
+    return blocks
+
+def mode4_decompress(blocks):
+    global Q
+    for i in range(len(blocks)):
+        #blocks[i] = (blocks[i]*Q).astype('int')
+        blocks[i] = (blocks[i]*Q)
+    return blocks     
+
+def Zig_zag_rle(blocks):
+    print('b', len(blocks))
+    blocks1 = []
+    for i in range(len(blocks)):
+        b1 = []
+        for j in range(1, 65):
+            if j < 8:
+                slice = [w[:j] for w in blocks[i][:j]]
+            else:
+                slice = [w[j-9:] for w in blocks[i][j-9:]]
+            diag = [slice[w][len(slice)-w-1] for w in range(len(slice))]
+            if len(diag) % 2:
+                diag.reverse()
+            b1 += diag
+
+        b2 = []
+        count_0 = 0
+        for j in range(64):
+                if b1[j] == 0:
+                    count_0 += 1
+                else:
+                    if count_0 != 0:
+                        b2.append(f'#{count_0}')
+                        count_0 = 0
+                    b2.append(str(b1[j]))
+        if count_0 != 0:
+            b2.append(f'#{count_0}')
+        blocks1.append(b2)
+    print('b1', len(blocks1))
+    return blocks1
+
+def Zig_zag_unrle(matrix):
+    #print(matrix)
+    matrix = matrix.split(' ')
+    blocks = []
+    for i in range(len(matrix)):
+        if matrix[i][0] == '#':
+            for j in range(int(matrix[i][1:])):
+                blocks.append(0)
+        else:
+            blocks.append(int(matrix[i]))
+    #blocks = np.array(blocks)
+    #blocks = np.reshape(blocks, (blocks.shape[0]//64,64))
+    blocks1 = [[0]*8]*8
+    for i in range(64):
+        blocks1[i//8][i%8] = blocks[i]
+        if i==0:
+            print(blocks1[0][0])
+    #blocks1 = np.array(blocks1)
+    #print(blocks1)
+    return blocks1
+
+
 '''ressembler le tout'''
 
 def compress(img_path, mode, nb_de_seuil):
-
+    
     y, cb, cr = to_Y_Cb_Cr(img_path)
+    #save(idct2(dct2(cr[8*8:8*9, 8*9:8*10])).astype('uint8'), 'a.png')
     img = [y, cb, cr]
+    save(idct2(dct2(y)).astype('uint8'), 'a.png')
 
     for i in range(3):
 
-        if mode == 2 and i != 0:
+        if mode >= 2 and i != 0:
             img[i] = diviser_par_deux(img[i])
 
         if i == 0:
@@ -203,13 +292,21 @@ def compress(img_path, mode, nb_de_seuil):
 
 
         #img[i] = appliquer_dct(decouper(img[i]))
-        img[i] = img[i].astype('int')
+        #img[i] = img[i].astype('int')
         img[i] = decouper(img[i])
         img[i] = appliquer_dct(img[i])
         
-        if mode != 0:
+        #if mode != 0:
+        if mode == 1 or mode == 2:
             #imposer le seuil
             img[i] = seuil(img[i], nb_de_seuil)
+            print('seuil', nb_de_seuil)
+            
+        elif mode == 3:
+            img[i] = mode3(img[i])
+        elif mode == 4:
+            img[i] = mode4_compress(img[i])
+        
 
     return img[0], img[1], img[2], initial_shape
 
@@ -218,6 +315,7 @@ def compress(img_path, mode, nb_de_seuil):
 
 def block_en_ligne(blocks):
     
+    blocks = np.array(blocks)
     blocks = blocks.astype('str')   
     blocks = np.reshape(blocks, (blocks.shape[0], 64))
     return blocks.tolist()
@@ -226,7 +324,7 @@ def write_file(img_path, mode = 2, use_rle = 'RLE', nb_de_seuil = 30):
     #teste que -1 <mode<4
     print('s', nb_de_seuil)
     y, cb, cr, initial_shape = compress(img_path, mode, nb_de_seuil)
-    y, cb, cr = np.around(y), np.around(cb, 1), np.around(cr, 1)
+    #y, cb, cr = np.around(y), np.around(cb, 1), np.around(cr, 1)
     f = open(img_path[:-4]+'_compressed.txt', 'w')
 
     f.write('SJPG\n')
@@ -238,17 +336,18 @@ def write_file(img_path, mode = 2, use_rle = 'RLE', nb_de_seuil = 30):
     for i in range(3):
         if use_rle == 'NORLE':
             img[i] = block_en_ligne(img[i])
-        else:
+        elif use_rle == 'RLE':
             img[i] = rle(img[i])
+        elif use_rle == 'ZIGZAG_RLE':
+            img[i] = Zig_zag_rle(img[i])
 
         for j in img[i]:
-
             f.write(' '.join(j))
             f.write('\n')
     
     f.close()
 
-write_file('test.png', mode = 1, use_rle = 'RLE', nb_de_seuil = 0)
+write_file('test.png', mode = 5, use_rle = 'RLE', nb_de_seuil = 4)
 
 
 '''decompresser'''
@@ -265,6 +364,11 @@ def str_to_array1(padding, im_shape1, lines, use_RLE):
             try:
                 blocks[i, :, :] = unrle(lines[i+padding].strip())
             except: print(i+padding)
+        elif use_RLE == 'ZIGZAG_RLE':
+            try:
+                blocks[i, :, :] = Zig_zag_unrle(lines[i+padding].strip())
+            except: 
+                print('aaaaa',i+padding)
         else:
             try:
                 matrix = lines[i+padding].strip().split(' ')
@@ -291,11 +395,12 @@ def decompresser(path):
     use_rle = lines[3].strip()
     
     img = [0]*3
-    print(img)
+    #print(img)
 
     padding = 5
+    #for i in range(3):
     for i in range(3):
-        if mode == 2:
+        if mode >= 2:
             if i == 1:
                 im_shape[1] = int(im_shape[1]/2)
 
@@ -304,15 +409,23 @@ def decompresser(path):
         img[i], padding = str_to_array1(padding, im_shape1, lines, use_rle)
         print(im_shape, im_shape1)
         print('p', padding)
-            
+
+        if i == 0:
+            print(img[i][100])
+        
+        if mode == 4:
+            img[i] = mode4_decompress(img[i])
+        #print(img[i])
+
         img[i] = appliquer_idct(img[i])
 
         
         img[i] = assembler(img[i], im_shape1)
+        
 
         #padding et /2 ou ->/2 et puis padding<-
         # donc d'abord unpad et puis *2
-        if mode == 2:
+        if mode >= 2:
             if i != 0:
                 print('mode')
                 img[i] = multiplier_par_deux(img[i])
@@ -325,7 +438,18 @@ def decompresser(path):
     #img =  np.dstack((img[0], img[1], img[2]))
     
     #Probleme! Trop d'artefacts
-    save(img.astype('uint8'), 'new_test4.png')
+    save(img.astype('uint8'), 'new_test5.png')
  
 
 decompresser('test_compressed.txt')
+
+print(psnr(load('test.png'), load('new_test5.png')))
+
+
+A = [[1,2,3,4],
+     [5,6,7,8],
+     [9,10,11,12],
+     [13,14,15,16]]
+#Zig_zag_rle(A)
+
+
