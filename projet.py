@@ -473,3 +473,58 @@ A = [[1,2,3,4, 51, 52, 53, 54],
 #print(Zig_zag_unrle(' '.join(Zig_zag_rle([np.array(A)])[0])))
 
 
+m = [[1,2,6, 7], 
+     [3,5,8,11], 
+     [4, 9, 10, 12]]
+
+def zigzag(matrix):
+
+    #Vecteurs direction du mouvement
+    droite = [0,1] #+1 colonne
+    bas = [1,0] #+1 ligne (vers le bas)
+    bas_gauche = [1, -1] #+1 ligne -1 colonne
+    haut_droite = [-1, 1] # +1 ligne +1 colonne
+    direction = haut_droite 
+
+    ligne = len(matrix)
+    colonne = len(matrix[0])
+    liste_zigzag = []
+    i, j = 0,0
+
+    while i < ligne and j < colonne:
+        liste_zigzag.append(matrix[i][j])
+
+        if direction == droite:
+            if i == 0: 
+                direction = bas_gauche
+            elif i == ligne-1:
+                direction = haut_droite
+            elif j == colonne - 1:
+                direction = bas
+
+        elif direction == bas:
+            if j==0:
+                direction= haut_droite
+            elif j == colonne-1:
+                direction = bas_gauche
+        
+        elif direction == haut_droite:
+            if i ==0:
+                direction = droite
+            elif j==colonne-1:
+                direction = bas
+        
+        elif direction == bas_gauche:
+            if i==ligne-1:
+                direction = droite
+            elif j == 0:
+                direction = bas
+
+        #On ajoute les coordonées des vecteurs mouvement à la position de matrix[i][j]
+        i+=direction[0]
+        j+=direction[1]
+
+    return liste_zigzag
+
+zigzag(m)
+
