@@ -492,6 +492,7 @@ def zigzag(matrix):
     i, j = 0,0
 
     while i < ligne and j < colonne:
+
         liste_zigzag.append(matrix[i][j])
 
         if direction == droite:
@@ -528,3 +529,55 @@ def zigzag(matrix):
 
 zigzag(m)
 
+
+def unzizag(liste_zigzag, longueur, largeur):
+
+    #Vecteurs direction du mouvement pour repositionnet les valeurs aux indices corrects
+    droite = [0,1] #+1 colonne
+    bas = [1,0] #+1 ligne (vers le bas)
+    bas_gauche = [1, -1] #+1 ligne -1 colonne
+    haut_droite = [-1, 1] # +1 ligne +1 colonne
+    direction = haut_droite 
+    i, j, a = 0, 0, 0
+    matrice_reconstruite = np.empty((largeur, longueur))
+
+
+    #On va parcourir à nouveau une matrice vide et la remplir en zigzag par les valeurs de la liste
+    while i < largeur and j < longueur:
+
+        matrice_reconstruite[i][j] = liste_zigzag[a]
+
+        if direction == droite:
+            if i == 0: 
+                direction = bas_gauche
+            elif i == largeur-1:
+                direction = haut_droite
+            elif j == longueur - 1:
+                direction = bas
+
+        elif direction == bas:
+            if j==0:
+                direction= haut_droite
+            elif j == longueur-1:
+                direction = bas_gauche
+        
+        elif direction == haut_droite:
+            if i ==0:
+                direction = droite
+            elif j==longueur-1:
+                direction = bas
+        
+        elif direction == bas_gauche:
+            if i==largeur-1:
+                direction = droite
+            elif j == 0:
+                direction = bas
+
+        #On ajoute les coordonées des vecteurs mouvement à la position de matrice à reconstruire
+        i+=direction[0]
+        j+=direction[1]
+        a+=1 #On continue à parcourir la liste zigzag
+
+    return matrice_reconstruite
+
+print(unzizag(zigzag(m), 4,3))
